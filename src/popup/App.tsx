@@ -1,5 +1,6 @@
 import { createSignal, onMount, For } from 'solid-js'
 import type { UrlRule } from '../shared/types'
+import { urlToDefaultPattern } from '../shared/urlPattern'
 
 function isValidMinutes(value: number): boolean {
   return Number.isFinite(value) && value >= 1
@@ -36,6 +37,18 @@ export default function App() {
       setRules((result['rules'] as UrlRule[]) ?? [])
     } catch (err) {
       setError(storageErrorMessage(err))
+    }
+
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+      if (tab?.url) {
+        const suggested = urlToDefaultPattern(tab.url)
+        if (suggested) {
+          setPattern(suggested)
+        }
+      }
+    } catch {
+      // Keep pattern empty when the active tab URL is unavailable.
     }
   })
 

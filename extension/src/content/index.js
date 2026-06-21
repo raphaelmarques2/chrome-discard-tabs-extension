@@ -1,1 +1,0 @@
-(function(){"use strict";function c(e,n){let t;return()=>{clearTimeout(t),t=setTimeout(e,n)}}if(!window.__tabSuspenderInjected){window.__tabSuspenderInjected=!0;const e=c(()=>{chrome.runtime.sendMessage({type:"ACTIVITY"}).catch(()=>{})},1e3);["mousemove","keydown","scroll","click","touchstart"].forEach(t=>document.addEventListener(t,e,{passive:!0})),e()}})();
