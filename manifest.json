@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Tab Suspender",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Suspends inactive tabs automatically based on URL rules",
   "permissions": ["tabs", "storage", "alarms", "scripting"],
   "background": {

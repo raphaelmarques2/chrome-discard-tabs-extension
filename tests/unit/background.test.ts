@@ -46,6 +46,7 @@ describe('background service worker', () => {
     changeInfo: chrome.tabs.TabChangeInfo,
     tab: chrome.tabs.Tab,
   ) => void
+  let onActivatedListener: (activeInfo: chrome.tabs.ActiveInfo) => void
   let onStorageChangedListener: (
     changes: Record<string, chrome.storage.StorageChange>,
     areaName: string,
@@ -71,6 +72,10 @@ describe('background service worker', () => {
         },
       },
       tabs: {
+        get: vi.fn().mockResolvedValue({
+          id: 10,
+          url: 'https://github.com/user/repo',
+        } as chrome.tabs.Tab),
         onRemoved: {
           addListener: vi.fn((listener) => {
             onRemovedListener = listener
@@ -79,6 +84,11 @@ describe('background service worker', () => {
         onUpdated: {
           addListener: vi.fn((listener) => {
             onUpdatedListener = listener
+          }),
+        },
+        onActivated: {
+          addListener: vi.fn((listener) => {
+            onActivatedListener = listener
           }),
         },
       },
@@ -111,6 +121,7 @@ describe('background service worker', () => {
     expect(chrome.runtime.onMessage.addListener).toHaveBeenCalled()
     expect(chrome.tabs.onRemoved.addListener).toHaveBeenCalled()
     expect(chrome.tabs.onUpdated.addListener).toHaveBeenCalled()
+    expect(chrome.tabs.onActivated.addListener).toHaveBeenCalled()
     expect(chrome.storage.onChanged.addListener).toHaveBeenCalled()
   })
 
@@ -172,6 +183,39 @@ describe('background service worker', () => {
     await vi.waitFor(() => {
       expect(onTabActivity).toHaveBeenCalledWith(8, 'https://github.com/page', [githubRule])
     })
+  })
+
+  it('handles tabs.onActivated for matching tabs', async () => {
+    onActivatedListener({ tabId: 10, windowId: 1 })
+
+    await vi.waitFor(() => {
+      expect(chrome.tabs.get).toHaveBeenCalledWith(10)
+      expect(onTabActivity).toHaveBeenCalledWith(10, 'https://github.com/user/repo', [githubRule])
+      expect(injectContentScript).toHaveBeenCalledWith(10)
+    })
+  })
+
+  it('ignores tabs.onActivated when tab has no url', async () => {
+    vi.mocked(chrome.tabs.get).mockResolvedValueOnce({ id: 11 } as chrome.tabs.Tab)
+
+    onActivatedListener({ tabId: 11, windowId: 1 })
+
+    await vi.waitFor(() => {
+      expect(chrome.tabs.get).toHaveBeenCalledWith(11)
+    })
+    expect(onTabActivity).not.toHaveBeenCalled()
+    expect(injectContentScript).not.toHaveBeenCalled()
+  })
+
+  it('ignores tabs.onActivated when tab lookup fails', async () => {
+    vi.mocked(chrome.tabs.get).mockRejectedValueOnce(new Error('No tab with id: 12'))
+
+    onActivatedListener({ tabId: 12, windowId: 1 })
+
+    await vi.waitFor(() => {
+      expect(chrome.tabs.get).toHaveBeenCalledWith(12)
+    })
+    expect(onTabActivity).not.toHaveBeenCalled()
   })
 
   it('reconciles deadlines and updates content scripts when rules change', async () => {

@@ -17,6 +17,13 @@ async function getRules(): Promise<UrlRule[]> {
   return (result['rules'] as UrlRule[]) ?? []
 }
 
+async function handleMatchingTab(tabId: number, url: string, rules: UrlRule[]): Promise<void> {
+  await onTabActivity(tabId, url, rules)
+  if (urlMatchesRules(url, rules)) {
+    await injectContentScript(tabId)
+  }
+}
+
 chrome.alarms.onAlarm.addListener((alarm) => {
   void handleSuspendAlarm(alarm.name)
 })
@@ -38,13 +45,21 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.url || (changeInfo.status === 'complete' && tab.url)) {
     const url = changeInfo.url ?? tab.url!
-    void getRules().then(async (rules) => {
-      await onTabActivity(tabId, url, rules)
-      if (urlMatchesRules(url, rules)) {
-        await injectContentScript(tabId)
-      }
-    })
+    void getRules().then((rules) => handleMatchingTab(tabId, url, rules))
   }
+})
+
+chrome.tabs.onActivated.addListener((activeInfo) => {
+  void getRules().then(async (rules) => {
+    let tab: chrome.tabs.Tab
+    try {
+      tab = await chrome.tabs.get(activeInfo.tabId)
+    } catch {
+      return
+    }
+    if (!tab.url) return
+    await handleMatchingTab(activeInfo.tabId, tab.url, rules)
+  })
 })
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
